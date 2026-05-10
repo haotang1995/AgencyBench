@@ -59,7 +59,7 @@ RUN if getent passwd 1000 >/dev/null; then \
       groupadd -g 1000 sandbox && useradd -m -u 1000 -g sandbox sandbox; \
     fi
 
-RUN npm install -g @google/gemini-cli @openai/codex @github/copilot \
+RUN npm install -g @google/gemini-cli @openai/codex @github/copilot @gair/sii-cli \
   && npm cache clean --force
 
 # Claude Code — install via official script to a world-readable prefix so the

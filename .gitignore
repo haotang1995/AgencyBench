@@ -1,2 +1,19 @@
 .github
 **__pycache__**
+
+# Local secrets — never commit
+prv_oai_example/
+progress/azure_overlay.env
+
+# Run outputs
+progress/runs/
+progress/transcripts/
+progress/summary.json
+
+# Per-scenario .env overlays produced by the driver
+AgencyBench-v2/*/scenario*/.env.run
+
+# Per-model run directories created by eval_task.py
+AgencyBench-v2/*/scenario*/azure_*
+AgencyBench-v2/*/scenario*/gpt-*
+AgencyBench-v2/*/scenario*/gpt_*
