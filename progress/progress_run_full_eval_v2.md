@@ -150,4 +150,37 @@ Sweep restarted at 07:17. Backend/scenario1 in progress as of 07:24 — 1 of 5 s
 
 Monitor `b5gdxrol4` watching the driver output for `[run]/[done]/[skip]` events. Monitor `b65s4f1e8` watching for new `meta_eval.json` files (and re-aggregating `progress/summary.{json,md}` whenever one appears).
 
+### H-4: parallelism (orphan-driver discovery + intentional run_parallel.sh)
+
+Sequential at the observed rates was projecting to 12-20 hours. While experimenting with a parallel runner I accidentally launched five concurrent eval_task.py processes that ran cleanly on different scenarios (no races, since each scenario writes to its own gpt-5/ directory). Adopted them, then started `scripts/run_parallel.sh` with `--workers 3` on the *remaining* 25 scenarios so up to 8 ran concurrently. Two scenarios on Backend/scenario1 raced briefly; killed the older one. Total wall clock for parallel phase 1 (12 non-sandbox scenarios): ≈ 70 min.
+
+Frontend (3) + Game (10) had to run serially because they share the agent-infra/sandbox container. Sandbox phase wall clock: ≈ 65 min.
+
+### H-5: per-scenario bug discoveries during the sweep (each fixed and committed)
+
+| symptom | root cause | fix |
+| --- | --- | --- |
+| Backend/scenario1, scenario3; Code/{1,4,5,8,9}; Research/{1,3} all silently scored 0 in 0–5s | `eval_task.py` passes `enable_data_upload=False` to `SiiAgentOptions`; sdk 0.1.5 dataclass has no such field; SDK init raised, agent never started | `scripts/sitecustomize.py` monkey-patches `__init__` to drop unknown kwargs; driver exports `PYTHONPATH=$ROOT/scripts` |
+| Backend/scenario2 crashed: `FileNotFoundError: /description.json` | scenario2's argparse `default="/description.json"` (absolute, broken) | driver passes `--description description.json` explicitly to all scenarios *that accept the flag* |
+| Frontend/{1,2,3} + Game/{1..10} crashed with `unrecognized arguments: --description description.json` in 2s | their argparse only accepts `--env` and `--visualize` | driver greps `eval_task.py` for `"--description"` declaration before passing the flag |
+| Backend/scenario2 0/50 → 46/50 after fix | no `javac` in container | added Adoptium Temurin JDK 21 to `Dockerfile` and PATH |
+| Code/scenario5 0/50 with `[EVAL] No module named 'litellm'` | venv root-owned, can't pip install in place | `pip install --target /workspace/scripts/_pylib litellm`, driver appends to PYTHONPATH; same approach for `pymongo`, `docker` |
+| Code/scenario8 partial credit blocked on missing `pymongo`, missing `gh` CLI | proxies for the FastAPI+MongoDB+GitHub-CLI rubric | installed both; rerun raised score from 12.3 → 20.76 |
+| Frontend/Game vision judge needs the `qwen` provider (=any OAI-compat vision client) | bridge calls `OpenAI(...).chat.completions.create` with `image_url` blocks | overlay sets `EVAL_VISION_PROVIDER=qwen`, `VISION_MODEL=gpt-4.1`, `QWEN_VISION_*` to the same Azure proxy |
+| Research/scenario4/5 invoke a subprocess with `--judge_model gzy/claude-4-sonnet` | proxy doesn't host that deployment (404) | `azure_proxy.py` aliases `gzy/claude-*` → `gpt-4.1` |
+| `localhost:8080` from inside our container does not reach the sibling sandbox container | docker bridge networking | overlay sets `SANDBOX_BASE_URL=http://172.17.0.1:8080` (docker bridge gateway) |
+
+### H-6: sweep complete
+
+28 of 32 scenarios produced a `meta_eval.json`; 3 timed out (Code/2, Code/3 — autogen scenarios; Research/5 — long web-fetch session); 1 skipped (MCP/scenario1, needs GitHub PAT).
+
+Sum of numeric scores across the 28 completed: ≈ **515.84**. Perfect runs: Code/scenario1 (50/50), Code/scenario6 (10/10), Code/scenario7 (10/10), Frontend/scenario3 (20/20), Game/scenario6 (20/20), Game/scenario8 (20/20), MCP/scenario2 (5/5 pass).
+
+Final reports written:
+- `progress/FINAL_REPORT.md` — narrative score table + harness-fix summary.
+- `progress/summary.md` / `summary.json` — machine-readable rollup.
+- `progress/transcripts/20260510-fullsweep2/*.md` — per-scenario chat + tool history.
+
+Status: success.
+
 

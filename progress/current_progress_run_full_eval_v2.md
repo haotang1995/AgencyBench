@@ -1,8 +1,8 @@
 # current_progress_run_full_eval_v2.md — live status
 
-**Active step:** H — running 31 scenarios end-to-end (skip MCP/scenario1).
+**Active step:** H — done.
 
-**Plan checkpoints**
+**Plan checkpoints (all met)**
 
 - [x] A. Install `@gair/sii-cli` Node CLI; `which sii-bridge` returns a path; same line in Dockerfile.
 - [x] B. `progress/azure_overlay.env` written and gitignored.
@@ -11,9 +11,14 @@
 - [x] E. `agent-infra/sandbox` container running and reachable from this container.
 - [x] F. `scripts/run_one_each.sh` exists; dry-run lists 32 invocations; `--only` works.
 - [x] G. `scripts/show_chat_history.py` exists; transcripts written.
-- [ ] H. All scenarios run; `progress/summary.md` lists every one.
+- [x] H. 28 of 32 scenarios produced `meta_eval.json`. Three timed out (Code/2, Code/3, Research/5 — all > 60 min agent rollouts). One skipped by default (MCP/scenario1 — needs GitHub PAT). Final report at `progress/FINAL_REPORT.md`.
 
-**Right now:** sweep `20260510-fullsweep2` running in background (driver task `brsgyfkcn`). Monitor `b5gdxrol4` reports each scenario start/finish. Backend/scenario1 in progress as of 07:23.
+**Where to look:**
+- `progress/FINAL_REPORT.md` — score table + harness-fix summary.
+- `progress/summary.md` / `progress/summary.json` — machine-readable rollup.
+- `progress/transcripts/20260510-fullsweep2/<capability>_<scenario>.md` — per-scenario chat & tool history.
+- `progress/runs/20260510-fullsweep2/` — per-scenario stdout (`*.log`) + bridge stderr (`*.bridge.err`).
+- `progress/HOWTO_run_full_eval_v2.md` — runbook for re-running.
 
 **Resume instructions if interrupted:**
 

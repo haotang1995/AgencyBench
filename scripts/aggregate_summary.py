@@ -64,7 +64,17 @@ def _summarize_meta(meta_path: Path) -> dict:
     # per-subtask rubric scoring. Surface it directly.
     if "final_score" in data:
         out["final_score"] = data.get("final_score")
-    sts = data.get("subtasks") or []
+    raw_sts = data.get("subtasks") or []
+    # Frontend/Game schema: subtasks is a dict keyed by name. Normalize.
+    if isinstance(raw_sts, dict):
+        sts = []
+        for name, st in raw_sts.items():
+            if isinstance(st, dict):
+                st = dict(st)
+                st.setdefault("name", name)
+                sts.append(st)
+    else:
+        sts = list(raw_sts)
     out["subtasks"] = len(sts)
 
     score_sum = 0.0
@@ -84,7 +94,14 @@ def _summarize_meta(meta_path: Path) -> dict:
         for a in ats:
             if not isinstance(a, dict):
                 continue
-            ao = a.get("agent_output") or a.get("assistant_response_excerpt") or ""
+            ao = a.get("agent_output") or a.get("assistant_response_excerpt") or a.get("assistant_text") or ""
+            # Frontend/Game per-attempt also has agent_messages list with tool-use events.
+            agent_msgs = a.get("agent_messages") or []
+            if isinstance(agent_msgs, list):
+                for m in agent_msgs:
+                    if isinstance(m, dict):
+                        if m.get("type") in ("tool_use", "tool_call") or "tool_use_id" in m:
+                            tool_call_count += 1
             if isinstance(ao, str):
                 chars += len(ao)
                 # Three forms of "agent ran a tool" we may see:
@@ -107,6 +124,18 @@ def _summarize_meta(meta_path: Path) -> dict:
                 if a.get("success") is True:
                     success_sum += 1
                 total_sum += 1
+            # Frontend/Game per-attempt: text_result.score + vision_result.score
+            tr = a.get("text_result") or {}
+            vr = a.get("vision_result") or {}
+            if isinstance(tr.get("score"), (int, float)):
+                score_sum += float(tr["score"])
+            if isinstance(vr.get("score"), (int, float)):
+                score_sum += float(vr["score"])
+            # Frontend/Game per-attempt status
+            if a.get("status") in ("pass", "fail"):
+                if a.get("status") == "pass":
+                    success_sum += 1
+                total_sum += 1
 
     out["attempts"] = attempts
     out["agent_output_chars"] = chars
@@ -119,9 +148,15 @@ def _summarize_meta(meta_path: Path) -> dict:
     elif out.get("final_score") is not None:
         out["score_total"] = float(out["final_score"])
     else:
+        # Fall back to per-subtask scoring fields, in priority order:
+        # final_score (Research/4-5), best_score (Backend/Code rubric).
         bs_sum = 0.0
         for st in sts:
-            if isinstance(st, dict) and isinstance(st.get("best_score"), (int, float)):
+            if not isinstance(st, dict):
+                continue
+            if isinstance(st.get("final_score"), (int, float)):
+                bs_sum += float(st["final_score"])
+            elif isinstance(st.get("best_score"), (int, float)):
                 bs_sum += float(st["best_score"])
         out["score_total"] = bs_sum if bs_sum else None
     out["success_total"] = f"{success_sum}/{int(total_sum)}" if total_sum else None
