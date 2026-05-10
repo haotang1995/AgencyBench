@@ -19,3 +19,7 @@ AgencyBench-v2/*/scenario*/gpt-*
 AgencyBench-v2/*/scenario*/gpt_*
 .sii/
 scripts/_pylib/
+
+# Per-scenario outputs that may leak into top-level cwd at runtime
+/datasets/
+/outputs/
