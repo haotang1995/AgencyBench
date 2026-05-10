@@ -125,4 +125,29 @@ Status: ready for Step H — run the full sweep.
 
 Starting `scripts/run_one_each.sh` with the defaults (skip MCP/scenario1) plus a 60-minute hard timeout per scenario. Observing in background.
 
+### H-1: first sweep failed silently — discovered the missing SDK kwarg
+
+`run_id=20260510-fullsweep` ran instantly (0–4s per scenario) and wrote bogus `meta_eval.json` files showing 0 scores everywhere. Bridge log revealed:
+
+> `[AGENT] Failed to initialize SII session: SiiAgentOptions.__init__() got an unexpected keyword argument 'enable_data_upload'`
+
+10 scenarios pass `enable_data_upload=False` to `SiiAgentOptions(...)` but the installed `sii-agent-sdk==0.1.5` does not have that field. The agent never started; the eval scored everything 0; subtasks reported "No rule to make target" because the agent never wrote anything.
+
+**Two related fixes** (both needed because the venv is root-owned and we cannot upgrade the SDK in place):
+
+1. `scripts/sitecustomize.py` monkey-patches `SiiAgentOptions.__init__` to drop kwargs that the dataclass does not define. The driver exports `PYTHONPATH=$ROOT/scripts` so this file is picked up before any scenario imports the SDK.
+2. Backend/scenario2 ships with `--description default="/description.json"` (absolute, broken). Driver now passes `--description description.json` to every scenario explicitly.
+
+Cleaned up the bad `gpt-5/` directories (Backend/{1,3}, Code/{1,2}); kept the one real success (`MCP/scenario2/gpt-5`).
+
+### H-2: alias gzy/claude judge models
+
+Pre-emptive proxy patch: Research/scenario4 and Research/scenario5 invoke an internal subprocess with `--judge_model gzy/claude-4-sonnet` hardcoded. The Azure proxy returns 404 for that model. Added `_MODEL_ALIASES` to `azure_proxy.py` mapping `gzy/claude-*` and `claude-*` → `gpt-4.1`. Verified with curl.
+
+### H-3: sweep `20260510-fullsweep2` running
+
+Sweep restarted at 07:17. Backend/scenario1 in progress as of 07:24 — 1 of 5 subtasks completed (`Execution completed: 5 turns, 175784ms`), agent on subtask2 turn 6 actively writing C++ source files.
+
+Monitor `b5gdxrol4` watching the driver output for `[run]/[done]/[skip]` events. Monitor `b65s4f1e8` watching for new `meta_eval.json` files (and re-aggregating `progress/summary.{json,md}` whenever one appears).
+
 
