@@ -105,6 +105,10 @@ run_one() {
       export JAVA_HOME=/home/sandbox/tools/jdk
       export PATH="$JAVA_HOME/bin:$PATH"
     fi
+    # Code/scenario8/9 evaluator probes for the gh CLI.
+    if [ -d /home/sandbox/tools/gh/bin ]; then
+      export PATH="/home/sandbox/tools/gh/bin:$PATH"
+    fi
     export PATH="/home/sandbox/.npm-global/bin:$PATH"
     # sitecustomize.py here patches SiiAgentOptions.__init__ to swallow the
     # `enable_data_upload` kwarg several scenarios pass (sdk 0.1.5 does

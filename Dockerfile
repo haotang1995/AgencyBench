@@ -98,7 +98,17 @@ ENV PATH=$AGENCYBENCH_VENV/bin:$PATH
 COPY requirements.txt /tmp/agencybench-requirements.txt
 RUN pip install --no-cache-dir -r /tmp/agencybench-requirements.txt \
  && rm /tmp/agencybench-requirements.txt \
- && pip install --no-cache-dir litellm
+ && pip install --no-cache-dir litellm pymongo
+
+# GitHub CLI (gh) for Code/scenario8 + 9 evaluators (which probe for `gh`).
+RUN curl -fsSL -o /tmp/gh.tar.gz \
+      https://github.com/cli/cli/releases/download/v2.78.0/gh_2.78.0_linux_amd64.tar.gz \
+ && mkdir -p /home/sandbox/tools \
+ && tar -C /home/sandbox/tools -xzf /tmp/gh.tar.gz \
+ && ln -sfn /home/sandbox/tools/gh_2.78.0_linux_amd64 /home/sandbox/tools/gh \
+ && chown -R 1000:1000 /home/sandbox/tools \
+ && rm /tmp/gh.tar.gz
+ENV PATH=/home/sandbox/tools/gh/bin:$PATH
 
 WORKDIR /workspace
 CMD ["bash"]
