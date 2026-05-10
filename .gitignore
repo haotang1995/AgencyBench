@@ -17,3 +17,4 @@ AgencyBench-v2/*/scenario*/.env.run
 AgencyBench-v2/*/scenario*/azure_*
 AgencyBench-v2/*/scenario*/gpt-*
 AgencyBench-v2/*/scenario*/gpt_*
+.sii/
