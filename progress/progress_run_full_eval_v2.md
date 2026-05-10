@@ -85,3 +85,44 @@ Bridge stderr: `[AgentService] Execution completed: 1 turns, 20887ms, 1 tool cal
 Status: success.
 Next: Step D — run `MCP/scenario2` end-to-end through `python eval_task.py`.
 
+---
+
+## 2026-05-10 — Step D: MCP/scenario2 end-to-end (DONE)
+
+First attempt failed at `EnvConfig.from_env`: `require("SII_USERNAME")` rejected the empty stubs in the overlay. Fix: changed the overlay to set `SII_USERNAME=unused-azure-overlay` / `SII_PASSWORD=unused-azure-overlay` (USE_OPENAI auth ignores them, but the validator needs non-empty strings).
+
+Second attempt ran cleanly. Wall-clock ≈ 6 minutes from start to meta_eval.json. The agent (GPT-5) hit the bridge's shell sandbox at one point — it tried `find … | while … $(dirname …)` which is rejected ("Command substitution using $(), <(), or >() is not allowed for security reasons") — then adapted with `find -print0 | while read -d ''` and parameter expansion. All 5 subtasks pass:
+
+- subtask1 (build workspace_v2 shell): success — "workspace_v2 directory skeleton exists."
+- subtask2 (move Python files): success — "Python files relocated into correct dev_bundle folders."
+- subtask3 (CSV migration): success — "CSV files split between legacy and active targets correctly."
+- subtask4 (markdown rename): success — "All markdown files moved and renamed with parent prefixes."
+- subtask5 (cleanup): success — "Legacy desktop/ tree successfully deleted."
+
+`meta_eval.json` schema for MCP scenarios uses `success`/`validator_message`/`assistant_response_excerpt` rather than the rubric/agent_output keys other scenarios use; extended `scripts/show_chat_history.py` to handle both schemas.
+
+---
+
+## 2026-05-10 — Step E: agent-infra sandbox container (DONE)
+
+- `docker pull ghcr.io/agent-infra/sandbox:latest` succeeded.
+- `docker run -d --rm --name agencybench-sandbox -p 8080:8080 ghcr.io/agent-infra/sandbox:latest` started cleanly; healthcheck flipped to "healthy" within ~10s.
+- From inside our container: `curl http://172.17.0.1:8080/` → 200; `http://172.17.0.10:8080/` (sandbox container's bridge IP) → 200; `localhost:8080` → connection refused (expected — `localhost` inside our container is *our* loopback, not the host's).
+- Updated `progress/azure_overlay.env` to `SANDBOX_BASE_URL=http://172.17.0.1:8080` (the docker-bridge gateway, resilient to the sandbox container restarting and getting a different bridge IP).
+
+---
+
+## 2026-05-10 — Steps F & G: driver + extractor (DONE)
+
+- `scripts/run_one_each.sh` dry-runs cleanly: lists 32 scenarios in order, MCP/scenario1 skipped by default. Supports `--only`, `--skip`, `--force`, `--run-id`. Computes the same `model_slug` `eval_task.py` does (`gpt-5` → `gpt-5`) so it can short-circuit on existing `meta_eval.json`.
+- `scripts/show_chat_history.py` tested on Backend/scenario1's reference run (14 kB markdown transcript) and on MCP/scenario2's gpt-5 run (5 kB transcript covering all 5 subtasks). Handles both meta_eval.json schemas (rubric vs MCP).
+
+Status: ready for Step H — run the full sweep.
+
+---
+
+## 2026-05-10 — Step H: run the full sweep (IN PROGRESS)
+
+Starting `scripts/run_one_each.sh` with the defaults (skip MCP/scenario1) plus a 60-minute hard timeout per scenario. Observing in background.
+
+

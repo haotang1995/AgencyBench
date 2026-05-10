@@ -100,10 +100,17 @@ run_one() {
   (
     cd "$d"
     export PATH="/home/sandbox/.npm-global/bin:$PATH"
+    # sitecustomize.py here patches SiiAgentOptions.__init__ to swallow the
+    # `enable_data_upload` kwarg several scenarios pass (sdk 0.1.5 does
+    # not have that field). Without this, those scenarios silently fail.
+    export PYTHONPATH="$ROOT/scripts:${PYTHONPATH:-}"
     export SII_BRIDGE_PATH="${SII_BRIDGE_PATH:-/tmp/bridge-shim.mjs}"
     export SII_BRIDGE_LOGFILE="$LOGDIR/${cap}_${sc}.bridge.err"
     : > "$SII_BRIDGE_LOGFILE"
-    timeout "$PER_SCENARIO_TIMEOUT" python3 eval_task.py --env .env.run
+    # Pass --description explicitly: Backend/scenario2 has a buggy
+    # default of "/description.json" (absolute, missing). All scenarios
+    # accept this flag.
+    timeout "$PER_SCENARIO_TIMEOUT" python3 eval_task.py --env .env.run --description description.json
   ) > "$logfile" 2>&1
   local ec=$?
   set -e
