@@ -60,6 +60,10 @@ def _summarize_meta(meta_path: Path) -> dict:
         return {"error": f"json parse: {exc}"}
 
     out: dict = {"model": data.get("model")}
+    # Some scenarios (Code/scenario6 family) use `final_score` instead of
+    # per-subtask rubric scoring. Surface it directly.
+    if "final_score" in data:
+        out["final_score"] = data.get("final_score")
     sts = data.get("subtasks") or []
     out["subtasks"] = len(sts)
 
@@ -108,7 +112,18 @@ def _summarize_meta(meta_path: Path) -> dict:
     out["agent_output_chars"] = chars
     out["tool_call_count"] = tool_call_count
     out["pass_points"] = f"{pass_sum}/{pass_total}" if pass_total else None
-    out["score_total"] = score_sum if score_sum else None
+    # Prefer per-subtask rubric score sum; fall back to final_score for
+    # the Code/scenario6 schema; fall back to per-subtask best_score sum.
+    if score_sum:
+        out["score_total"] = score_sum
+    elif out.get("final_score") is not None:
+        out["score_total"] = float(out["final_score"])
+    else:
+        bs_sum = 0.0
+        for st in sts:
+            if isinstance(st, dict) and isinstance(st.get("best_score"), (int, float)):
+                bs_sum += float(st["best_score"])
+        out["score_total"] = bs_sum if bs_sum else None
     out["success_total"] = f"{success_sum}/{int(total_sum)}" if total_sum else None
     return out
 
