@@ -97,20 +97,29 @@ def parse_agent_output(raw: str, max_block: int = 2000) -> list[str]:
     return out
 
 
-def render_attempt(attempt: dict, max_block: int) -> str:
+def render_attempt(attempt: dict, max_block: int, parent_name: str = "?") -> str:
     lines: list[str] = []
-    sub = attempt.get("subtask", "?")
+    sub = attempt.get("subtask", parent_name)
     idx = attempt.get("attempt_index", "?")
     score = attempt.get("score")
     rubric = attempt.get("rubric") or {}
     failed = ", ".join(rubric.get("failed_points") or []) or "(none)"
     pass_count = rubric.get("pass_count")
     total = rubric.get("total_points")
-    lines.append(
-        f"### {sub} attempt {idx}  —  score={score} ({pass_count}/{total})  failed: {failed}"
-    )
+    if score is None and "success" in attempt:
+        # MCP-style schema: pass/fail per attempt instead of numeric rubric.
+        success = attempt.get("success")
+        validator = attempt.get("validator_message") or ""
+        lines.append(
+            f"### {sub} attempt {idx}  —  success={success}  validator: {validator}"
+        )
+    else:
+        lines.append(
+            f"### {sub} attempt {idx}  —  score={score} ({pass_count}/{total})  failed: {failed}"
+        )
     lines.append("")
-    blocks = parse_agent_output(attempt.get("agent_output") or "", max_block=max_block)
+    body = attempt.get("agent_output") or attempt.get("assistant_response_excerpt") or ""
+    blocks = parse_agent_output(body, max_block=max_block)
     if not blocks:
         lines.append("_no agent_output_")
     else:
