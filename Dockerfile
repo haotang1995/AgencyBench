@@ -97,7 +97,8 @@ ENV PATH=$AGENCYBENCH_VENV/bin:$PATH
 # mount at runtime.
 COPY requirements.txt /tmp/agencybench-requirements.txt
 RUN pip install --no-cache-dir -r /tmp/agencybench-requirements.txt \
- && rm /tmp/agencybench-requirements.txt
+ && rm /tmp/agencybench-requirements.txt \
+ && pip install --no-cache-dir litellm
 
 WORKDIR /workspace
 CMD ["bash"]

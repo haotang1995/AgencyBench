@@ -109,7 +109,10 @@ run_one() {
     # sitecustomize.py here patches SiiAgentOptions.__init__ to swallow the
     # `enable_data_upload` kwarg several scenarios pass (sdk 0.1.5 does
     # not have that field). Without this, those scenarios silently fail.
-    export PYTHONPATH="$ROOT/scripts:${PYTHONPATH:-}"
+    # _pylib carries pip-installed packages the venv lacks (litellm,
+    # required by Code/scenario5's evaluator). It must come AFTER scripts/
+    # so sitecustomize.py is found there.
+    export PYTHONPATH="$ROOT/scripts:$ROOT/scripts/_pylib:${PYTHONPATH:-}"
     export SII_BRIDGE_PATH="${SII_BRIDGE_PATH:-/tmp/bridge-shim.mjs}"
     export SII_BRIDGE_LOGFILE="$LOGDIR/${cap}_${sc}.bridge.err"
     : > "$SII_BRIDGE_LOGFILE"
