@@ -120,10 +120,17 @@ run_one() {
     export SII_BRIDGE_PATH="${SII_BRIDGE_PATH:-/tmp/bridge-shim.mjs}"
     export SII_BRIDGE_LOGFILE="$LOGDIR/${cap}_${sc}.bridge.err"
     : > "$SII_BRIDGE_LOGFILE"
-    # Pass --description explicitly: Backend/scenario2 has a buggy
-    # default of "/description.json" (absolute, missing). All scenarios
-    # accept this flag.
-    timeout "$PER_SCENARIO_TIMEOUT" python3 eval_task.py --env .env.run --description description.json
+    # Pass --description explicitly only for scenarios whose argparse
+    # accepts it. Backend/scenario2 has a buggy default
+    # "/description.json" (absolute, missing) so we MUST pass it there;
+    # the other Backend/Code/Research/MCP scenarios accept it harmlessly;
+    # Frontend and Game scenarios do NOT accept it and will exit 2.
+    if grep -q '"--description"' eval_task.py; then
+      desc_arg=(--description description.json)
+    else
+      desc_arg=()
+    fi
+    timeout "$PER_SCENARIO_TIMEOUT" python3 eval_task.py --env .env.run "${desc_arg[@]}"
   ) > "$logfile" 2>&1
   local ec=$?
   set -e
