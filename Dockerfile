@@ -62,6 +62,19 @@ RUN if getent passwd 1000 >/dev/null; then \
 RUN npm install -g @google/gemini-cli @openai/codex @github/copilot @gair/sii-cli \
   && npm cache clean --force
 
+# Portable JDK 21 (Temurin) for AgencyBench Backend/scenario2 which
+# compiles and runs Java. Apt-installing default-jdk works fine here too,
+# but the Adoptium tarball is smaller and is what we use at runtime.
+RUN install -d -o 1000 -g 1000 /home/sandbox/tools \
+ && curl -fsSL -o /tmp/jdk.tar.gz \
+      https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_linux_hotspot_21.0.5_11.tar.gz \
+ && tar -C /home/sandbox/tools -xzf /tmp/jdk.tar.gz \
+ && ln -sfn /home/sandbox/tools/jdk-21.0.5+11 /home/sandbox/tools/jdk \
+ && chown -R 1000:1000 /home/sandbox/tools \
+ && rm /tmp/jdk.tar.gz
+ENV JAVA_HOME=/home/sandbox/tools/jdk
+ENV PATH=$JAVA_HOME/bin:$PATH
+
 # Claude Code — install via official script to a world-readable prefix so the
 # non-root sandbox user can execute it (the default /root prefix is mode 700).
 RUN HOME=/opt/claude-cli curl -fsSL https://claude.ai/install.sh | HOME=/opt/claude-cli bash \

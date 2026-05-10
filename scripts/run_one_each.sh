@@ -99,6 +99,12 @@ run_one() {
   set +e
   (
     cd "$d"
+    # Backend/scenario2 needs javac/java; use the portable JDK we
+    # unpacked under /home/sandbox/tools (also referenced in Dockerfile).
+    if [ -d /home/sandbox/tools/jdk/bin ]; then
+      export JAVA_HOME=/home/sandbox/tools/jdk
+      export PATH="$JAVA_HOME/bin:$PATH"
+    fi
     export PATH="/home/sandbox/.npm-global/bin:$PATH"
     # sitecustomize.py here patches SiiAgentOptions.__init__ to swallow the
     # `enable_data_upload` kwarg several scenarios pass (sdk 0.1.5 does
