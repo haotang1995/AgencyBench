@@ -106,7 +106,22 @@ def render_attempt(attempt: dict, max_block: int, parent_name: str = "?") -> str
     failed = ", ".join(rubric.get("failed_points") or []) or "(none)"
     pass_count = rubric.get("pass_count")
     total = rubric.get("total_points")
-    if score is None and "success" in attempt:
+    text_result = attempt.get("text_result") or {}
+    vision_result = attempt.get("vision_result") or {}
+    status_str = attempt.get("status")
+    if status_str in ("pass", "fail", "retry"):
+        # Frontend/Game schema
+        lines.append(
+            f"### {sub} attempt {idx}  —  status={status_str}  text={text_result.get('score')}  vision={vision_result.get('score')}"
+        )
+        reasons = []
+        if text_result.get('reason'): reasons.append(f"text: {text_result['reason']}")
+        if vision_result.get('reason'): reasons.append(f"vision: {vision_result['reason']}")
+        if reasons:
+            lines.append("")
+            for r in reasons:
+                lines.append(f"_{_truncate(r, 600)}_")
+    elif score is None and "success" in attempt:
         # MCP-style schema: pass/fail per attempt instead of numeric rubric.
         success = attempt.get("success")
         validator = attempt.get("validator_message") or ""
@@ -118,8 +133,37 @@ def render_attempt(attempt: dict, max_block: int, parent_name: str = "?") -> str
             f"### {sub} attempt {idx}  —  score={score} ({pass_count}/{total})  failed: {failed}"
         )
     lines.append("")
-    body = attempt.get("agent_output") or attempt.get("assistant_response_excerpt") or ""
+    body = (
+        attempt.get("agent_output")
+        or attempt.get("assistant_response_excerpt")
+        or attempt.get("assistant_text")
+        or ""
+    )
     blocks = parse_agent_output(body, max_block=max_block)
+
+    # Frontend/Game scenarios store agent_messages as a list of dicts.
+    agent_msgs = attempt.get("agent_messages") or []
+    if isinstance(agent_msgs, list):
+        for m in agent_msgs:
+            if not isinstance(m, dict):
+                continue
+            mt = m.get("type")
+            if mt == "assistant":
+                # nested content blocks
+                for c in m.get("content") or []:
+                    if isinstance(c, dict):
+                        if c.get("type") == "text" and c.get("text"):
+                            blocks.append(f"[ASSISTANT TEXT]\n{_truncate(c['text'], max_block)}")
+                        elif c.get("type") in ("tool_use", "tool_call"):
+                            args = c.get("input") or {}
+                            blocks.append(f"[TOOL CALL] {c.get('name')}({_truncate(json.dumps(args, ensure_ascii=False), max_block)})")
+            elif mt == "tool_result":
+                content = m.get("content")
+                if isinstance(content, (list, dict)):
+                    content = json.dumps(content, ensure_ascii=False)
+                if content:
+                    blocks.append(f"[TOOL RESULT]\n{_truncate(str(content), max_block)}")
+
     if not blocks:
         lines.append("_no agent_output_")
     else:
@@ -169,15 +213,31 @@ def main() -> int:
     chunks.append(f"- model: `{data.get('model','?')}`")
     chunks.append(f"- scorer: `{data.get('scorer','?')}`")
     chunks.append(f"- max_attempts: {data.get('max_attempts','?')}")
-    chunks.append(f"- subtasks: {len(data.get('subtasks') or [])}")
+    raw_sts = data.get("subtasks") or []
+    if isinstance(raw_sts, dict):
+        sts = []
+        for name, st in raw_sts.items():
+            if isinstance(st, dict):
+                st = dict(st)
+                st.setdefault("name", name)
+                sts.append(st)
+    else:
+        sts = list(raw_sts)
+    chunks.append(f"- subtasks: {len(sts)}")
     chunks.append("")
-    for st in data.get("subtasks") or []:
-        chunks.append(f"## {st.get('name', '?')}")
-        chunks.append(f"- best_score: {st.get('best_score')}")
-        chunks.append(f"- best_attempt: {st.get('best_attempt')}")
+    for st in sts:
+        if not isinstance(st, dict):
+            continue
+        chunks.append(f"## {st.get('name', st.get('subtask', '?'))}")
+        if st.get("best_score") is not None:
+            chunks.append(f"- best_score: {st.get('best_score')}")
+        if st.get("final_score") is not None:
+            chunks.append(f"- final_score: {st.get('final_score')}")
+        if st.get("success") is not None:
+            chunks.append(f"- success: {st.get('success')}")
         chunks.append("")
         for at in st.get("attempts") or []:
-            chunks.append(render_attempt(at, max_block))
+            chunks.append(render_attempt(at, max_block, parent_name=st.get('name', '?')))
             chunks.append("")
     md = "\n".join(chunks)
     if args.out:
