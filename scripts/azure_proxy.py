@@ -52,6 +52,23 @@ _client = httpx.Client(timeout=httpx.Timeout(connect=15, read=600, write=600, po
 _MAX_COMPLETION_TOKENS_CAP = int(os.environ.get("AZURE_PROXY_MAX_TOKENS", "32768"))
 
 
+# Aliases for models that the SII reference scenarios hardcode but
+# our Azure proxy does not host (e.g. Research/scenario4 + scenario5
+# subprocess-call --judge_model gzy/claude-4-sonnet for rubric recall
+# scoring). Map to a real, reachable deployment instead of letting
+# those scenarios 404.
+_MODEL_ALIASES = {
+    "gzy/claude-4-sonnet": "gpt-4.1",
+    "gzy/claude-4.5-sonnet": "gpt-4.1",
+    "gzy/claude-4.5-opus": "gpt-4.1",
+    "gzy_claude-4-sonnet": "gpt-4.1",
+    "gzy_claude-4.5-sonnet": "gpt-4.1",
+    "gzy_claude-4.5-opus": "gpt-4.1",
+    "claude-sonnet-4-5": "gpt-4.1",
+    "claude-opus-4-5": "gpt-4.1",
+}
+
+
 def _rewrite_chat_body(raw: bytes) -> bytes:
     if not raw:
         return raw
@@ -62,6 +79,10 @@ def _rewrite_chat_body(raw: bytes) -> bytes:
     if not isinstance(body, dict):
         return raw
     changed = False
+    model = body.get("model")
+    if isinstance(model, str) and model in _MODEL_ALIASES:
+        body["model"] = _MODEL_ALIASES[model]
+        changed = True
     mt = body.pop("max_tokens", None)
     if mt is not None:
         body["max_completion_tokens"] = min(int(mt), _MAX_COMPLETION_TOKENS_CAP)
